@@ -49,9 +49,9 @@ def getTriIndices(subdiv,points,img):
 		# cv2.circle(img, pt1, 1, (0, 0, 255), 4)
 		# cv2.circle(img, pt2, 1, (0, 0, 255), 4)
 		# cv2.circle(img, pt3, 1, (0, 0, 255), 4)
-		cv2.line(img, pt1, pt2, (0, 0, 255), 2)
-		cv2.line(img, pt2, pt3, (0, 0, 255), 2)
-		cv2.line(img, pt1, pt3, (0, 0, 255), 2)
+		# cv2.line(img, pt1, pt2, (0, 0, 255), 2)
+		# cv2.line(img, pt2, pt3, (0, 0, 255), 2)
+		# cv2.line(img, pt1, pt3, (0, 0, 255), 2)
 
 		# cv2.imshow('denauly1',img)
 		# cv2.waitKey(0)
@@ -158,7 +158,7 @@ def getTri(image):
 	points = []
 	for (x, y) in shape:
 		points.append((int(x), int(y)))
-		cv2.circle(image, (x, y), 1, (0, 255, 0), 4)
+		# cv2.circle(image, (x, y), 1, (0, 255, 0), 4)
 
 	#expanding the rect to fit the feature points
 	rect_exp = 20
@@ -220,6 +220,14 @@ def shape_to_np(shape, dtype="int"):
 	# return the list of (x, y)-coordinates
 	return coords
 
+def fitRectTri(src1,src2,src3):
+	min_x = min(src1[0],src2[0],src3[0])
+	min_y = min(src1[1],src2[1],src3[1])
+	max_x = max(src1[0],src2[0],src3[0])
+	max_y = max(src1[1],src2[1],src3[1])
+
+	return [min_x,max_x,min_y,max_y]
+
 cap = cv2.VideoCapture('/dev/video0')
 # load the input image, resize it, and convert it to grayscale
 ret, imageDest = cap.read()
@@ -229,25 +237,40 @@ subdivDest,image1,destPoints = getTri(imageDest)
 bListInv1 = calBarycentricInv(subdivDest)
 
 imageSource = cv2.imread('TestSet_P2/Scarlett.jpg')
-subdivSrc,image2,srcPoints = getTri(imageSource)
-bList2 = calBarycentric(subdivSrc)
+_,image2,srcPoints = getTri(imageSource)
+# bList2 = calBarycentric(subdivSrc)
 
 indexesTrianglesDest = getTriIndices(subdivDest,destPoints,imageDest)
+
 print(indexesTrianglesDest)
 for triangle_index in indexesTrianglesDest:
-	pt1 = srcPoints[triangle_index[0]]
-	pt2 = srcPoints[triangle_index[1]]
-	pt3 = srcPoints[triangle_index[2]]
-	print(pt1)
-	print(pt2)
-	print(pt3)
-	cv2.line(imageSource, pt1, pt2, (0, 0, 255), 2)
-	cv2.line(imageSource, pt3, pt2, (0, 0, 255), 2)
-	cv2.line(imageSource, pt1, pt3, (0, 0, 255), 2)
+	src_pt1 = srcPoints[triangle_index[0]]
+	src_pt2 = srcPoints[triangle_index[1]]
+	src_pt3 = srcPoints[triangle_index[2]]
+	dst_pt1 = destPoints[triangle_index[0]]
+	dst_pt2 = destPoints[triangle_index[1]]
+	dst_pt3 = destPoints[triangle_index[2]]
 
-cv2.imshow('denauly1',imageDest)
-cv2.imshow('denauly2',imageSource)
-cv2.waitKey(0)
+
+	rect_src = fitRectTri(src_pt1,src_pt2,src_pt3)
+	print(rect_src)
+	imageSource = cv2.rectangle(imageSource, (rect_src[0],rect_src[2]), (rect_src[1],rect_src[3]), (0, 255, 0), 3)
+
+	rect_dst = fitRectTri(dst_pt1,dst_pt2,dst_pt3)
+	print(rect_dst)
+	imageDest = cv2.rectangle(imageDest, (rect_dst[0],rect_dst[2]), (rect_dst[1],rect_dst[3]), (0, 255, 0), 3)
+
+	cv2.line(imageDest, dst_pt1, dst_pt2, (0, 0, 255), 2)
+	cv2.line(imageDest, dst_pt3, dst_pt2, (0, 0, 255), 2)
+	cv2.line(imageDest, dst_pt1, dst_pt3, (0, 0, 255), 2)
+
+	cv2.line(imageSource, src_pt1, src_pt2, (0, 0, 255), 2)
+	cv2.line(imageSource, src_pt3, src_pt2, (0, 0, 255), 2)
+	cv2.line(imageSource, src_pt1, src_pt3, (0, 0, 255), 2)
+
+	cv2.imshow('denauly1',imageDest)
+	cv2.imshow('denauly2',imageSource)
+	cv2.waitKey(0)
 
 
 # print(imageDest.shape)
