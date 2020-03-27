@@ -65,29 +65,15 @@ def extract_index_nparray(nparray):
 		break
 	return index
 
-def calBarycentricInv(subdiv):
-	triangleList = subdiv.getTriangleList()
-	bList = []
-	for t in triangleList :
-		pt1 = (t[0], t[1])
-		pt2 = (t[2], t[3])
-		pt3 = (t[4], t[5])
-		B = np.array([[pt1[0],pt2[0],pt3[0]],[pt1[1],pt2[1],pt3[1]],[1,1,1]])
-		# print(np.linalg.inv(B))
-		bList.append(np.linalg.inv(B))
-	return bList
+def calBarycentricInv(pt1,pt2,pt3):
+	B = np.array([[pt1[0],pt2[0],pt3[0]],[pt1[1],pt2[1],pt3[1]],[1,1,1]])
+	# print(B)
+	return np.linalg.inv(B)
 
-def calBarycentric(subdiv):
-	triangleList = subdiv.getTriangleList()
-	bList = []
-	for t in triangleList :
-		pt1 = (t[0], t[1])
-		pt2 = (t[2], t[3])
-		pt3 = (t[4], t[5])
-		B = np.array([[pt1[0],pt2[0],pt3[0]],[pt1[1],pt2[1],pt3[1]],[1,1,1]])
-		# print(np.linalg.inv(B))
-		bList.append(np.linalg.inv(B))
-	return bList
+def calBarycentric(pt1,pt2,pt3):
+	B = np.array([[pt1[0],pt2[0],pt3[0]],[pt1[1],pt2[1],pt3[1]],[1,1,1]])
+	# print(B)
+	return B
 
 # def checkInside(xy,subdiv,bList):
 
@@ -228,15 +214,31 @@ def fitRectTri(src1,src2,src3):
 
 	return [min_x,max_x,min_y,max_y]
 
+def replacePixels(imageDest,imageSource,bInv,a,rect_dst):
+	for x in range(rect_dst[0],rect_dst[1]):
+		for y in range(rect_dst[2],rect_dst[3]):
+			# print(bInv)
+			# print(rect_dst)
+			abc = np.matmul(bInv,np.array([x,y,1]))
+			if(0<=abc[0]<=1 and 0<=abc[1]<=1 and 0<=abc[2]<=1):
+				xyz = np.matmul(a,abc)
+				xSrc = xyz[0]/xyz[2]
+				ySrc = xyz[1]/xyz[2]
+				imageDest[y,x]=imageSource[int(ySrc),int(xSrc)]	
+			# else:
+			# 	imageDest[y,x]=[255,255,255]
+
 cap = cv2.VideoCapture('/dev/video0')
 # load the input image, resize it, and convert it to grayscale
 ret, imageDest = cap.read()
 
-imageDest = cv2.imread('TestSet_P2/Rambo.jpg')
+# imageDest = cv2.imread('TestSet_P2/Rambo.jpg')
+imageDest = cv2.imread('TestSet_P2/Scarlett.jpg')
 subdivDest,image1,destPoints = getTri(imageDest)
-bListInv1 = calBarycentricInv(subdivDest)
+# bListInv1 = calBarycentricInv(subdivDest)
 
-imageSource = cv2.imread('TestSet_P2/Scarlett.jpg')
+# imageSource = cv2.imread('TestSet_P2/Scarlett.jpg')
+imageSource = cv2.imread('TestSet_P2/Rambo.jpg')
 _,image2,srcPoints = getTri(imageSource)
 # bList2 = calBarycentric(subdivSrc)
 
@@ -252,25 +254,27 @@ for triangle_index in indexesTrianglesDest:
 	dst_pt3 = destPoints[triangle_index[2]]
 
 
-	rect_src = fitRectTri(src_pt1,src_pt2,src_pt3)
-	print(rect_src)
-	imageSource = cv2.rectangle(imageSource, (rect_src[0],rect_src[2]), (rect_src[1],rect_src[3]), (0, 255, 0), 3)
+	# rect_src = fitRectTri(src_pt1,src_pt2,src_pt3)
+	# imageSource = cv2.rectangle(imageSource, (rect_src[0],rect_src[2]), (rect_src[1],rect_src[3]), (0, 255, 0), 3)
 
 	rect_dst = fitRectTri(dst_pt1,dst_pt2,dst_pt3)
-	print(rect_dst)
-	imageDest = cv2.rectangle(imageDest, (rect_dst[0],rect_dst[2]), (rect_dst[1],rect_dst[3]), (0, 255, 0), 3)
+	# imageDest = cv2.rectangle(imageDest, (rect_dst[0],rect_dst[2]), (rect_dst[1],rect_dst[3]), (0, 255, 0), 3)
+	
+	bInv = calBarycentricInv(dst_pt1,dst_pt2,dst_pt3)
+	a = calBarycentric(src_pt1,src_pt2,src_pt3)
+	replacePixels(imageDest,imageSource,bInv,a,rect_dst)
 
-	cv2.line(imageDest, dst_pt1, dst_pt2, (0, 0, 255), 2)
-	cv2.line(imageDest, dst_pt3, dst_pt2, (0, 0, 255), 2)
-	cv2.line(imageDest, dst_pt1, dst_pt3, (0, 0, 255), 2)
+	# cv2.line(imageDest, dst_pt1, dst_pt2, (0, 0, 255), 2)
+	# cv2.line(imageDest, dst_pt3, dst_pt2, (0, 0, 255), 2)
+	# cv2.line(imageDest, dst_pt1, dst_pt3, (0, 0, 255), 2)
 
-	cv2.line(imageSource, src_pt1, src_pt2, (0, 0, 255), 2)
-	cv2.line(imageSource, src_pt3, src_pt2, (0, 0, 255), 2)
-	cv2.line(imageSource, src_pt1, src_pt3, (0, 0, 255), 2)
+	# cv2.line(imageSource, src_pt1, src_pt2, (0, 0, 255), 2)
+	# cv2.line(imageSource, src_pt3, src_pt2, (0, 0, 255), 2)
+	# cv2.line(imageSource, src_pt1, src_pt3, (0, 0, 255), 2)
 
-	cv2.imshow('denauly1',imageDest)
-	cv2.imshow('denauly2',imageSource)
-	cv2.waitKey(0)
+cv2.imshow('denauly1',imageDest)
+cv2.imshow('denauly2',imageSource)
+cv2.waitKey(0)
 
 
 # print(imageDest.shape)
