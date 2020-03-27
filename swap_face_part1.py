@@ -5,6 +5,7 @@ import imutils
 import dlib
 import cv2
 import random
+from scipy import interpolate
 
 def findTuple(pts,pt):
 	p1 = pt[0]
@@ -214,7 +215,7 @@ def fitRectTri(src1,src2,src3):
 
 	return [min_x,max_x,min_y,max_y]
 
-def replacePixels(imageDest,imageSource,bInv,a,rect_dst):
+def replacePixels(imageDest,interpObjs,bInv,a,rect_dst):
 	for x in range(rect_dst[0],rect_dst[1]):
 		for y in range(rect_dst[2],rect_dst[3]):
 			# print(bInv)
@@ -224,27 +225,39 @@ def replacePixels(imageDest,imageSource,bInv,a,rect_dst):
 				xyz = np.matmul(a,abc)
 				xSrc = xyz[0]/xyz[2]
 				ySrc = xyz[1]/xyz[2]
-				imageDest[y,x]=imageSource[int(ySrc),int(xSrc)]	
-			# else:
-			# 	imageDest[y,x]=[255,255,255]
+				b = interpObjs[0](xSrc,ySrc)
+				g = interpObjs[1](xSrc,ySrc)
+				r = interpObjs[2](xSrc,ySrc)
+				imageDest[y,x]=[b,g,r]	
+
 
 cap = cv2.VideoCapture('/dev/video0')
 # load the input image, resize it, and convert it to grayscale
 ret, imageDest = cap.read()
 
-# imageDest = cv2.imread('TestSet_P2/Rambo.jpg')
-imageDest = cv2.imread('TestSet_P2/Scarlett.jpg')
+imageDest = cv2.imread('TestSet_P2/Rambo.jpg')
+# imageDest = cv2.imread('TestSet_P2/Scarlett.jpg')
 subdivDest,image1,destPoints = getTri(imageDest)
 # bListInv1 = calBarycentricInv(subdivDest)
 
-# imageSource = cv2.imread('TestSet_P2/Scarlett.jpg')
-imageSource = cv2.imread('TestSet_P2/Rambo.jpg')
+imageSource = cv2.imread('TestSet_P2/Scarlett.jpg')
+# imageSource = cv2.imread('TestSet_P2/Rambo.jpg')
 _,image2,srcPoints = getTri(imageSource)
 # bList2 = calBarycentric(subdivSrc)
 
 indexesTrianglesDest = getTriIndices(subdivDest,destPoints,imageDest)
 
+gray = cv2.cvtColor(imageSource, cv2.COLOR_BGR2GRAY)
+
+y_src_range = np.arange(imageSource.shape[0])
+x_src_range = np.arange(imageSource.shape[1])
+
+interpObjb = interpolate.interp2d(x_src_range, y_src_range, imageSource[:,:,0], kind='cubic')
+interpObjg = interpolate.interp2d(x_src_range, y_src_range, imageSource[:,:,1], kind='cubic')
+interpObjr = interpolate.interp2d(x_src_range, y_src_range, imageSource[:,:,2], kind='cubic')
+interpObjs = [interpObjb,interpObjg,interpObjr]
 print(indexesTrianglesDest)
+
 for triangle_index in indexesTrianglesDest:
 	src_pt1 = srcPoints[triangle_index[0]]
 	src_pt2 = srcPoints[triangle_index[1]]
@@ -262,7 +275,11 @@ for triangle_index in indexesTrianglesDest:
 	
 	bInv = calBarycentricInv(dst_pt1,dst_pt2,dst_pt3)
 	a = calBarycentric(src_pt1,src_pt2,src_pt3)
-	replacePixels(imageDest,imageSource,bInv,a,rect_dst)
+
+	# nx, ny = imageSource.shape[1], imageSource.shape[0]
+	# X, Y = np.meshgrid(np.arange(0, nx, 1), np.arange(0, ny, 1))
+
+	replacePixels(imageDest,interpObjs,bInv,a,rect_dst)
 
 	# cv2.line(imageDest, dst_pt1, dst_pt2, (0, 0, 255), 2)
 	# cv2.line(imageDest, dst_pt3, dst_pt2, (0, 0, 255), 2)
