@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 # import the necessary packages
 from collections import OrderedDict
 import numpy as np
