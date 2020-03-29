@@ -6,7 +6,7 @@ import dlib
 import cv2
 import random
 from scipy import interpolate
-
+import copy
 def findTuple(pts,pt):
 	p1 = pt[0]
 	p2 = pt[1]
@@ -215,7 +215,8 @@ def fitRectTri(src1,src2,src3):
 
 	return [min_x,max_x,min_y,max_y]
 
-def replacePixels(imageDest,interpObjs,bInv,a,rect_dst):
+
+def replacePixels(imageDest, interpObjs, bInv, a, rect_dst, mask, mask_moments):
 	for x in range(rect_dst[0],rect_dst[1]):
 		for y in range(rect_dst[2],rect_dst[3]):
 			# print(bInv)
@@ -228,20 +229,23 @@ def replacePixels(imageDest,interpObjs,bInv,a,rect_dst):
 				b = interpObjs[0](xSrc,ySrc)
 				g = interpObjs[1](xSrc,ySrc)
 				r = interpObjs[2](xSrc,ySrc)
-				imageDest[y,x]=[b,g,r]	
+				imageDest[y,x]=[b,g,r]
+				mask[y,x] = (255,255,255)
+				mask_moments[y,x] = 1
 
 
 cap = cv2.VideoCapture('/dev/video0')
 # load the input image, resize it, and convert it to grayscale
 ret, imageDest = cap.read()
 
-imageDest = cv2.imread('TestSet_P2/Rambo.jpg')
-# imageDest = cv2.imread('TestSet_P2/Scarlett.jpg')
+# imageDest = cv2.imread('TestSet_P2/Rambo.jpg')
+imageDest = cv2.imread('TestSet_P2/Scarlett.jpg')
+imageDestPoisson = copy.deepcopy(imageDest)
 subdivDest,image1,destPoints = getTri(imageDest)
 # bListInv1 = calBarycentricInv(subdivDest)
 
-imageSource = cv2.imread('TestSet_P2/Scarlett.jpg')
-# imageSource = cv2.imread('TestSet_P2/Rambo.jpg')
+# imageSource = cv2.imread('TestSet_P2/Scarlett.jpg')
+imageSource = cv2.imread('TestSet_P2/Rambo.jpg')
 _,image2,srcPoints = getTri(imageSource)
 # bList2 = calBarycentric(subdivSrc)
 
@@ -258,6 +262,8 @@ interpObjr = interpolate.interp2d(x_src_range, y_src_range, imageSource[:,:,2], 
 interpObjs = [interpObjb,interpObjg,interpObjr]
 print(indexesTrianglesDest)
 
+mask_moments = np.zeros((imageDest.shape[0], imageDest.shape[1]))
+mask = np.zeros(imageDest.shape, imageDest.dtype)
 for triangle_index in indexesTrianglesDest:
 	src_pt1 = srcPoints[triangle_index[0]]
 	src_pt2 = srcPoints[triangle_index[1]]
@@ -279,7 +285,7 @@ for triangle_index in indexesTrianglesDest:
 	# nx, ny = imageSource.shape[1], imageSource.shape[0]
 	# X, Y = np.meshgrid(np.arange(0, nx, 1), np.arange(0, ny, 1))
 
-	replacePixels(imageDest,interpObjs,bInv,a,rect_dst)
+	replacePixels(imageDest, interpObjs, bInv, a, rect_dst, mask, mask_moments)
 
 	# cv2.line(imageDest, dst_pt1, dst_pt2, (0, 0, 255), 2)
 	# cv2.line(imageDest, dst_pt3, dst_pt2, (0, 0, 255), 2)
@@ -289,8 +295,26 @@ for triangle_index in indexesTrianglesDest:
 	# cv2.line(imageSource, src_pt3, src_pt2, (0, 0, 255), 2)
 	# cv2.line(imageSource, src_pt1, src_pt3, (0, 0, 255), 2)
 
+# cv2.seamlessClone(imageDest, imageDestPoisson, mask, center, cv2.NORMAL_CLONE)
+
+M = cv2.moments(mask_moments)
+cX = int(M["m10"] / M["m00"])
+cY = int(M["m01"] / M["m00"])
+print cX
+print cY
+# cX = 717
+# cY = 223
+cv2.circle(mask, (cX, cY), 3, 0, 4)
+print(imageDest.shape)
+print(imageDestPoisson.shape)
+# imageDest = np.array(imageDest, dtype=np.float)
+# imageDestPoisson = np.array(imageDestPoisson, dtype=np.float)
+
+output = cv2.seamlessClone(imageDest, imageDestPoisson, mask,(cX,cY),cv2.NORMAL_CLONE)
 cv2.imshow('denauly1',imageDest)
 cv2.imshow('denauly2',imageSource)
+cv2.imshow('mask', mask)
+cv2.imshow('output', output)
 cv2.waitKey(0)
 
 
