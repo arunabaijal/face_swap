@@ -26,13 +26,8 @@ def start():
     
     # load the input image, resize it, and convert it to grayscale
     images = ['Scarlett.jpg', 'Rambo.jpg']
-    imageA1 = cv2.imread('Scarlett.jpg')
-    # imageA = imutils.resize(imageA, width=500)
+    imageA = cv2.imread('Scarlett.jpg')
     imageB = cv2.imread('Rambo.jpg')
-    # imageB = imutils.resize(imageB, width=500)
-    imageA = copy.deepcopy(imageA1)
-    rects = detector(imageA1, 1)
-    imageA = imageA[rects[0].top()-40:rects[0].bottom()+40,rects[0].left()-40:rects[0].right()+40,:]
     grayA = cv2.cvtColor(imageA, cv2.COLOR_BGR2GRAY)
     # detect faces in the grayscale image
     rectsA = detector(grayA, 1)
@@ -162,12 +157,12 @@ def start():
     r = cv2.boundingRect(mask_warped_img)
     center = ((r[0] + int(r[2] / 2), r[1] + int(r[3] / 2)))
     output = cv2.seamlessClone(warped_img.copy(), imageA, mask_warped_img, center, cv2.NORMAL_CLONE)
-    imageA1[rects[0].top() - 40:rects[0].bottom() + 40, rects[0].left() - 40:rects[0].right() + 40, :] = output
+    # imageA[rects[0].top() - 40:rects[0].bottom() + 40, rects[0].left() - 40:rects[0].right() + 40, :] = output
     # cv2.imshow("warped_img", warped_img)
     # cv2.imshow("mask_warped", mask_warped_img)
     # cv2.imshow("mask", mask)
 
-    cv2.imshow('output', imageA1)
+    cv2.imshow('output', output)
     cv2.waitKey(0)
     
     # a1 = weights[-1]
