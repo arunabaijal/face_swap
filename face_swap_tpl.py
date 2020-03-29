@@ -8,6 +8,7 @@ import cv2
 import math
 from numpy.linalg import norm
 import sys
+import copy
 
 def start():
     # construct the argument parser and parse the arguments
@@ -25,10 +26,13 @@ def start():
     
     # load the input image, resize it, and convert it to grayscale
     images = ['Scarlett.jpg', 'Rambo.jpg']
-    imageA = cv2.imread('Scarlett.jpg')
-    imageA = imutils.resize(imageA, width=500)
+    imageA1 = cv2.imread('Scarlett.jpg')
+    # imageA = imutils.resize(imageA, width=500)
     imageB = cv2.imread('Rambo.jpg')
-    imageB = imutils.resize(imageB, width=500)
+    # imageB = imutils.resize(imageB, width=500)
+    imageA = copy.deepcopy(imageA1)
+    rects = detector(imageA1, 1)
+    imageA = imageA[rects[0].top()-40:rects[0].bottom()+40,rects[0].left()-40:rects[0].right()+40,:]
     grayA = cv2.cvtColor(imageA, cv2.COLOR_BGR2GRAY)
     # detect faces in the grayscale image
     rectsA = detector(grayA, 1)
@@ -36,6 +40,7 @@ def start():
     # detect faces in the grayscale image
     rectsB = detector(grayB, 1)
     PA = []
+    PB = []
     shapeA = None
     shapeB = None
     xPointsA = []
@@ -63,8 +68,8 @@ def start():
         # 	cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
         # loop over the (x, y)-coordinates for the facial landmarks
         # and draw them on the image
-        for (x, y) in shapeA:
-            cv2.circle(imageA, (x, y), 1, (0, 0, 255), -1)
+        # for (x, y) in shapeA:
+            # cv2.circle(imageA, (x, y), 1, (0, 0, 255), -1)
     # loop over the face detections
     for (i, rect) in enumerate(rectsB):
         # determine the facial landmarks for the face region, then
@@ -82,15 +87,16 @@ def start():
         # loop over the (x, y)-coordinates for the facial landmarks
         # and draw them on the image
         for (x, y) in shapeB:
+            PB.append([x,y,1])
             xPointsB.append(x)
             yPointsB.append(y)
-            cv2.circle(imageB, (x, y), 1, (0, 0, 255), -1)
+            # cv2.circle(imageB, (x, y), 1, (0, 0, 255), -1)
     K = np.zeros([len(shapeA), len(shapeA)])
     for i in range(len(shapeA)):
         for j in range(len(shapeA)):
-            r = norm(shapeA[i] - shapeA[j], 1) + np.exp(10**-7)
+            r = norm(shapeA[i] - shapeA[j], 2) + np.exp(10**-7)
             K[i][j] = (r**2)*(math.log(r**2))
-    mat = np.vstack((np.hstack((K, PA)), np.hstack((np.transpose(PA), np.zeros((3,3))))))
+    mat = np.vstack([np.hstack((K, PA)), np.hstack([np.transpose(PA), np.zeros([3,3])])])
     lam = np.exp(10**-7)
     V = []
     for v in xPointsB:
@@ -98,11 +104,11 @@ def start():
     V.append(0)
     V.append(0)
     V.append(0)
-    
+    print('K',K)
     weights_x = np.matmul(np.linalg.inv(mat + lam*np.identity(len(shapeA) + 3)), V)
     
     V = []
-    for v in xPointsB:
+    for v in yPointsB:
         V.append(v)
     V.append(0)
     V.append(0)
@@ -110,6 +116,7 @@ def start():
     
     weights_y = np.matmul(np.linalg.inv(mat + lam*np.identity(len(shapeA) + 3)), V)
     # print(weights)
+    print(weights_x,weights_y)
     w, h = imageB.shape[:2]
     mask = mask_from_points((w, h), shapeB)
     # def warp_tps(img_source,img_target,points1,points2,weights_x,weights_y,mask):
@@ -155,7 +162,13 @@ def start():
     r = cv2.boundingRect(mask_warped_img)
     center = ((r[0] + int(r[2] / 2), r[1] + int(r[3] / 2)))
     output = cv2.seamlessClone(warped_img.copy(), imageA, mask_warped_img, center, cv2.NORMAL_CLONE)
-    cv2.imshow('output', output)
+    imageA1[rects[0].top() - 40:rects[0].bottom() + 40, rects[0].left() - 40:rects[0].right() + 40, :] = output
+    # cv2.imshow("warped_img", warped_img)
+    # cv2.imshow("mask_warped", mask_warped_img)
+    # cv2.imshow("mask", mask)
+
+    cv2.imshow('output', imageA1)
+    cv2.waitKey(0)
     
     # a1 = weights[-1]
     # ay = weights[-2]
@@ -188,10 +201,7 @@ def start():
     
     # show the output image with the face detections + facial landmarks
     # cv2.imshow("OutputA", imageA)
-    cv2.imshow("OutputB", warped_img)
-    cv2.imshow("mask_warped", mask_warped_img)
-    cv2.imshow("mask", mask)
-    cv2.waitKey(0)
+    
 
 def U(r):
     return (r**2)*(math.log(r**2))
@@ -199,7 +209,7 @@ def U(r):
 def fxy(pt1,pts2,weights):
     K = np.zeros([pts2.shape[0],1])
     for i in range(pts2.shape[0]):
-        K[i] = U(np.linalg.norm((pts2[i]-pt1),1) + np.exp(10**-7))
+        K[i] = U(np.linalg.norm((pts2[i]-pt1),2) + np.exp(10**-7))
     f = weights[-1] + weights[-3]*pt1[0] +weights[-2]*pt1[1]+np.matmul(K.T,weights[0:-3])
     return f
 
