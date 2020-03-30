@@ -169,6 +169,32 @@ def getTri(image):
 
 	return subdiv,image,points
 
+
+def detectFaces(image):
+	detector = dlib.get_frontal_face_detector()
+	predictor = dlib.shape_predictor('shape_predictor_68_face_landmarks.dat')
+
+	img_orig = image.copy()
+
+	# image = imutils.resize(image, width=500)
+	gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+
+	# detect faces in the grayscale image
+	rects = detector(gray, 1)
+
+	# loop over the face detections
+	if(len(rect)!=0):
+		rect = rects[0]
+		# determine the facial landmarks for the face region, then
+		# convert the facial landmark (x, y)-coordinates to a NumPy
+		# array
+		shape = predictor(gray, rect)
+		shape = shape_to_np(shape)
+		# convert dlib's rectangle to a OpenCV-style bounding box
+		# [i.e., (x, y, w, h)], then draw the face bounding box
+		(x, y, w, h) = rect_to_bb(rect)
+		cv2.rectangle(image, (x, y), (x + w, y + h), (0, 255, 0), 2)
+
 # Draw voronoi diagram
 def draw_voronoi(img, subdiv) :
 	# ( facets, centers) = subdiv.getVoronoiFacetList([])
@@ -234,14 +260,20 @@ def replacePixels(imageDest, interpObjs, bInv, a, rect_dst, mask, mask_moments):
 				mask_moments[y,x] = 1
 
 
-cap = cv2.VideoCapture('/dev/video0')
+vidcap = cv2.VideoCapture('TestSet_P2/Test1.mp4')
 # load the input image, resize it, and convert it to grayscale
-ret, imageDest = cap.read()
+# ret, imageDest = cap.read()
 
 # imageDest = cv2.imread('TestSet_P2/Rambo.jpg')
-imageDest = cv2.imread('TestSet_P2/Scarlett.jpg')
+# imageDest = cv2.imread('TestSet_P2/Scarlett.jpg')
+success, imageDest = vidcap.read()
+cv2.imshow('imageDest', imageDest)
+cv2.waitKey(0)
 imageDestPoisson = copy.deepcopy(imageDest)
-subdivDest,image1,destPoints = getTri(imageDest)
+detectFaces(imageDest)
+# subdivDest,image1,destPoints = getTri(imageDest)
+
+'''
 # bListInv1 = calBarycentricInv(subdivDest)
 
 # imageSource = cv2.imread('TestSet_P2/Scarlett.jpg')
@@ -337,3 +369,4 @@ cv2.waitKey(0)
 
 # cv2.imshow('voronoi',image)
 # cv2.waitKey(0)
+'''
