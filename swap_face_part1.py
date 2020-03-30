@@ -7,6 +7,8 @@ import cv2
 import random
 from scipy import interpolate
 import copy
+from collections import deque
+
 def findTuple(pts,pt):
 	p1 = pt[0]
 	p2 = pt[1]
@@ -66,10 +68,14 @@ def extract_index_nparray(nparray):
 		break
 	return index
 
-def calBarycentricInv(pt1,pt2,pt3):
-	B = np.array([[pt1[0],pt2[0],pt3[0]],[pt1[1],pt2[1],pt3[1]],[1,1,1]])
+def calBarycentricInv(pt1,pt2,pt3,invSuccessFlag):
+	try:
+		B = np.array([[pt1[0],pt2[0],pt3[0]],[pt1[1],pt2[1],pt3[1]],[1,1,1]])
+		return np.linalg.inv(B), invSuccessFlag
+	except:
+		invSuccessFlag = False
+		return None, invSuccessFlag
 	# print(B)
-	return np.linalg.inv(B)
 
 def calBarycentric(pt1,pt2,pt3):
 	B = np.array([[pt1[0],pt2[0],pt3[0]],[pt1[1],pt2[1],pt3[1]],[1,1,1]])
@@ -125,7 +131,8 @@ def getTri(image):
 
 	# detect faces in the grayscale image
 	rects = detector(gray, 1)
-
+	if(len(rects)==0):
+		return None, image, None, False
 	# loop over the face detections
 	rect = rects[0]
 	# determine the facial landmarks for the face region, then
@@ -145,7 +152,7 @@ def getTri(image):
 	points = []
 	for (x, y) in shape:
 		points.append((int(x), int(y)))
-		# cv2.circle(image, (x, y), 1, (0, 255, 0), 4)
+		cv2.circle(image, (x, y), 1, (0, 255, 0), 4)
 
 	#expanding the rect to fit the feature points
 	rect_exp = 20
@@ -167,7 +174,7 @@ def getTri(image):
 	# cv2.waitKey(0)
 
 
-	return subdiv,image,points
+	return subdiv,image,points,True
 
 # Draw voronoi diagram
 def draw_voronoi(img, subdiv) :
@@ -215,6 +222,27 @@ def fitRectTri(src1,src2,src3):
 
 	return [min_x,max_x,min_y,max_y]
 
+def appendList(sourceFacesList, destPoints):
+	sourceFacesList.append(destPoints)
+	if(len(sourceFacesList) > 10):
+		sourceFacesList.popleft()
+	return sourceFacesList
+
+
+def avgList(sourceFacesist):
+	destList= []
+	for ind in range(68):
+		sumPoint = np.zeros((2))
+		for k in range(len(sourceFacesList)):
+			# print(sourceFacesList[k][ind])
+			sumPoint += np.array(sourceFacesList[k][ind])
+		# print(sumPoint)
+		avgPoint = (int(sumPoint[0]/len(sourceFacesList)),int(
+		            sumPoint[1]/len(sourceFacesList)))
+		# print(avgPoint)
+		destList.append(avgPoint)
+	print(destList)
+	return destList
 
 def replacePixels(imageDest, interpObjs, bInv, a, rect_dst, mask, mask_moments):
 	for x in range(rect_dst[0],rect_dst[1]):
@@ -233,25 +261,13 @@ def replacePixels(imageDest, interpObjs, bInv, a, rect_dst, mask, mask_moments):
 				mask[y,x] = (255,255,255)
 				mask_moments[y,x] = 1
 
-
-cap = cv2.VideoCapture('/dev/video0')
-# load the input image, resize it, and convert it to grayscale
-ret, imageDest = cap.read()
-
-# imageDest = cv2.imread('TestSet_P2/Rambo.jpg')
-imageDest = cv2.imread('TestSet_P2/Scarlett.jpg')
-imageDestPoisson = copy.deepcopy(imageDest)
-subdivDest,image1,destPoints = getTri(imageDest)
 # bListInv1 = calBarycentricInv(subdivDest)
 
 # imageSource = cv2.imread('TestSet_P2/Scarlett.jpg')
 imageSource = cv2.imread('TestSet_P2/Rambo.jpg')
-_,image2,srcPoints = getTri(imageSource)
+_, image2, srcPoints, faceDetected = getTri(imageSource)
 # bList2 = calBarycentric(subdivSrc)
-
-indexesTrianglesDest = getTriIndices(subdivDest,destPoints,imageDest)
-
-gray = cv2.cvtColor(imageSource, cv2.COLOR_BGR2GRAY)
+# gray = cv2.cvtColor(imageSource, cv2.COLOR_BGR2GRAY)
 
 y_src_range = np.arange(imageSource.shape[0])
 x_src_range = np.arange(imageSource.shape[1])
@@ -260,62 +276,103 @@ interpObjb = interpolate.interp2d(x_src_range, y_src_range, imageSource[:,:,0], 
 interpObjg = interpolate.interp2d(x_src_range, y_src_range, imageSource[:,:,1], kind='cubic')
 interpObjr = interpolate.interp2d(x_src_range, y_src_range, imageSource[:,:,2], kind='cubic')
 interpObjs = [interpObjb,interpObjg,interpObjr]
-print(indexesTrianglesDest)
 
-mask_moments = np.zeros((imageDest.shape[0], imageDest.shape[1]))
-mask = np.zeros(imageDest.shape, imageDest.dtype)
-for triangle_index in indexesTrianglesDest:
-	src_pt1 = srcPoints[triangle_index[0]]
-	src_pt2 = srcPoints[triangle_index[1]]
-	src_pt3 = srcPoints[triangle_index[2]]
-	dst_pt1 = destPoints[triangle_index[0]]
-	dst_pt2 = destPoints[triangle_index[1]]
-	dst_pt3 = destPoints[triangle_index[2]]
+vidcap = cv2.VideoCapture('TestSet_P2/Test1.mp4')
+# load the input image, resize it, and convert it to grayscale
+# ret, imageDest = cap.read()
 
+# imageDest = cv2.imread('TestSet_P2/Rambo.jpg')
+# imageDest = cv2.imread('TestSet_P2/Scarlett.jpg')
+success, imageDest = vidcap.read()
+i = 0
 
-	# rect_src = fitRectTri(src_pt1,src_pt2,src_pt3)
-	# imageSource = cv2.rectangle(imageSource, (rect_src[0],rect_src[2]), (rect_src[1],rect_src[3]), (0, 255, 0), 3)
-
-	rect_dst = fitRectTri(dst_pt1,dst_pt2,dst_pt3)
-	# imageDest = cv2.rectangle(imageDest, (rect_dst[0],rect_dst[2]), (rect_dst[1],rect_dst[3]), (0, 255, 0), 3)
+sourceFacesList = deque([])
+firstRun = True
+while(success):
+	imageDestPoisson = copy.deepcopy(imageDest)
+	imageDestFilter = copy.deepcopy(imageDest)
+	subdivDest,image1,destPoints,faceDetected = getTri(imageDest)
 	
-	bInv = calBarycentricInv(dst_pt1,dst_pt2,dst_pt3)
-	a = calBarycentric(src_pt1,src_pt2,src_pt3)
+	print(i)
+	print(faceDetected)
+	if(faceDetected):
+		if firstRun:
+			indexesTrianglesDest = getTriIndices(subdivDest,destPoints,imageDest)
+			firstRun = False
+		sourceFacesList = appendList(sourceFacesList, destPoints)
+		destPoints = avgList(sourceFacesList)
 
-	# nx, ny = imageSource.shape[1], imageSource.shape[0]
-	# X, Y = np.meshgrid(np.arange(0, nx, 1), np.arange(0, ny, 1))
+		for (x, y) in destPoints:
+			cv2.circle(imageDestFilter, (x, y), 1, (0, 255, 0), 4)
+		image1 = imageDestFilter
+		'''
+		# print(len(destPoints))
+		mask_moments = np.zeros((imageDest.shape[0], imageDest.shape[1]))
+		mask = np.zeros(imageDest.shape, imageDest.dtype)
+		invSuccessFlag = True
+		for triangle_index in indexesTrianglesDest:
+			src_pt1 = srcPoints[triangle_index[0]]
+			src_pt2 = srcPoints[triangle_index[1]]
+			src_pt3 = srcPoints[triangle_index[2]]
+			dst_pt1 = destPoints[triangle_index[0]]
+			dst_pt2 = destPoints[triangle_index[1]]
+			dst_pt3 = destPoints[triangle_index[2]]
 
-	replacePixels(imageDest, interpObjs, bInv, a, rect_dst, mask, mask_moments)
 
-	# cv2.line(imageDest, dst_pt1, dst_pt2, (0, 0, 255), 2)
-	# cv2.line(imageDest, dst_pt3, dst_pt2, (0, 0, 255), 2)
-	# cv2.line(imageDest, dst_pt1, dst_pt3, (0, 0, 255), 2)
+			# rect_src = fitRectTri(src_pt1,src_pt2,src_pt3)
+			# imageSource = cv2.rectangle(imageSource, (rect_src[0],rect_src[2]), (rect_src[1],rect_src[3]), (0, 255, 0), 3)
 
-	# cv2.line(imageSource, src_pt1, src_pt2, (0, 0, 255), 2)
-	# cv2.line(imageSource, src_pt3, src_pt2, (0, 0, 255), 2)
-	# cv2.line(imageSource, src_pt1, src_pt3, (0, 0, 255), 2)
+			rect_dst = fitRectTri(dst_pt1,dst_pt2,dst_pt3)
+			# imageDest = cv2.rectangle(imageDest, (rect_dst[0],rect_dst[2]), (rect_dst[1],rect_dst[3]), (0, 255, 0), 3)
+			
+			bInv, invSuccessFlag = calBarycentricInv(
+				dst_pt1, dst_pt2, dst_pt3, invSuccessFlag)
+			a = calBarycentric(src_pt1,src_pt2,src_pt3)
 
-# cv2.seamlessClone(imageDest, imageDestPoisson, mask, center, cv2.NORMAL_CLONE)
+			# nx, ny = imageSource.shape[1], imageSource.shape[0]
+			# X, Y = np.meshgrid(np.arange(0, nx, 1), np.arange(0, ny, 1))
 
-M = cv2.moments(mask_moments)
-cX = int(M["m10"] / M["m00"])
-cY = int(M["m01"] / M["m00"])
-print cX
-print cY
-# cX = 717
-# cY = 223
-cv2.circle(mask, (cX, cY), 3, 0, 4)
-print(imageDest.shape)
-print(imageDestPoisson.shape)
-# imageDest = np.array(imageDest, dtype=np.float)
-# imageDestPoisson = np.array(imageDestPoisson, dtype=np.float)
+			if(invSuccessFlag):
+				replacePixels(imageDest, interpObjs, bInv, a, rect_dst, mask, mask_moments)
 
-output = cv2.seamlessClone(imageDest, imageDestPoisson, mask,(cX,cY),cv2.NORMAL_CLONE)
-cv2.imshow('denauly1',imageDest)
-cv2.imshow('denauly2',imageSource)
-cv2.imshow('mask', mask)
-cv2.imshow('output', output)
-cv2.waitKey(0)
+			# cv2.line(imageDest, dst_pt1, dst_pt2, (0, 0, 255), 2)
+			# cv2.line(imageDest, dst_pt3, dst_pt2, (0, 0, 255), 2)
+			# cv2.line(imageDest, dst_pt1, dst_pt3, (0, 0, 255), 2)
+
+			# cv2.line(imageSource, src_pt1, src_pt2, (0, 0, 255), 2)
+			# cv2.line(imageSource, src_pt3, src_pt2, (0, 0, 255), 2)
+			# cv2.line(imageSource, src_pt1, src_pt3, (0, 0, 255), 2)
+
+		# cv2.seamlessClone(imageDest, imageDestPoisson, mask, center, cv2.NORMAL_CLONE)
+		if invSuccessFlag:
+			M = cv2.moments(mask_moments)
+			cX = int(M["m10"] / M["m00"])
+			cY = int(M["m01"] / M["m00"])
+			cv2.circle(mask, (cX, cY), 3, 0, 4)
+			# print(imageDest.shape)
+			# print(imageDestPoisson.shape)
+			# imageDest = np.array(imageDest, dtype=np.float)
+			# imageDestPoisson = np.array(imageDestPoisson, dtype=np.float)
+
+			image1 = cv2.seamlessClone(
+				imageDest, imageDestPoisson, mask, (cX, cY), cv2.NORMAL_CLONE)
+			# cv2.imshow('denauly1',imageDest)
+			# cv2.imshow('denauly2',imageSource)
+			# cv2.imshow('mask', mask)
+			# cv2.imshow('output', image1)
+			# cv2.waitKey(0)
+	'''
+	# cv2.imshow('imageDest', image1)
+	cv2.imwrite('output/'+str(i)+'.jpg', image1)
+	# cv2.waitKey(0)
+	success, imageDest = vidcap.read()
+	i += 1
+cv2.destroyAllWindows()
+
+
+'''
+
+
 
 
 # print(imageDest.shape)
@@ -337,3 +394,4 @@ cv2.waitKey(0)
 
 # cv2.imshow('voronoi',image)
 # cv2.waitKey(0)
+'''
