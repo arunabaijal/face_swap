@@ -11,7 +11,7 @@ import sys
 import copy
 import os
 
-def start():
+def start(swap, image, video):
     # construct the argument parser and parse the arguments
     # ap = argparse.ArgumentParser()
     # ap.add_argument("-p", "--shape-predictor", required=True,
@@ -22,15 +22,15 @@ def start():
     
     # initialize dlib's face detector (HOG-based) and then create
     # the facial landmark predictor
-    cam = cv2.VideoCapture("TestSet_P2/Test1.mp4")
+    cam = cv2.VideoCapture(video)
     width = int(cam.get(3))  # float
     height = int(cam.get(4))
     print(width, height)
-    vidWriter = cv2.VideoWriter("./video_output_test1.mp4",cv2.VideoWriter_fourcc(*'mp4v'), int(cam.get(cv2.CAP_PROP_FPS)), (width, height))
+    vidWriter = cv2.VideoWriter("./video_output_data1.mp4",cv2.VideoWriter_fourcc(*'mp4v'), int(cam.get(5)), (width, height))
     detector = dlib.get_frontal_face_detector()
     predictor = dlib.shape_predictor('shape_predictor_68_face_landmarks.dat')
-    swap = False
-    face_swap_file = 'Rambo.jpg'
+    # swap = True
+    face_swap_file = image
     # load the input image, resize it, and convert it to grayscale
     # images = ['Scarlett.jpg', 'Rambo.jpg']
     # imageA = cv2.imread('Scarlett.jpg')
@@ -135,7 +135,7 @@ def start():
                 # cv2.imshow("mask_warped", mask_warped_img)
                 # cv2.imshow("mask", mask)
             vidWriter.write(output)
-            cv2.imwrite('output_t1_' + str(currentframe) + '.jpg', output)
+            cv2.imwrite('output_data1_' + str(currentframe) + '.jpg', output)
             # cv2.waitKey(0)
 
             # increasing counter so that it will
