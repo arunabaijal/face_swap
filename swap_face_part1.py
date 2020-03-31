@@ -17,8 +17,10 @@ def findTuple(pts,pt):
 		if(point[0]==p1):
 			if(point[1]==p2):
 				return ind
+	print(pts)
+	print(p1,p2)
 	print('element not found!!')
-	return 'not found'
+	return None
 
 def getTriIndices(subdiv,points,img):
 	triangles = subdiv.getTriangleList()
@@ -152,7 +154,11 @@ def getTri(image):
 	points = []
 	for (x, y) in shape:
 		points.append((int(x), int(y)))
-		cv2.circle(image, (x, y), 1, (0, 255, 0), 4)
+		# cv2.circle(image, (x, y), 1, (0, 255, 0), 4)
+
+	# cv2.imshow('image',image)
+	# cv2.waitKey(0)
+	# cv2.destroyAllWindows()
 
 	#expanding the rect to fit the feature points
 	rect_exp = 20
@@ -165,8 +171,11 @@ def getTri(image):
 	subdiv = cv2.Subdiv2D((rect_x, rect_y,rect_h, rect_w));
 	# Dividing entire image into triangles
 	# subdiv = cv2.Subdiv2D((0, 0,image.shape[1], image.shape[0]));
-	for p in points:
-		subdiv.insert(p)
+	try:
+		for p in points:
+			subdiv.insert(p)
+	except:
+		return None, image, None, False
 		# Show animation
 	# bList = calBarycentric(subdiv)
 	# draw_delaunay(image, subdiv, (255, 255, 255) )
@@ -224,7 +233,7 @@ def fitRectTri(src1,src2,src3):
 
 def appendList(sourceFacesList, destPoints):
 	sourceFacesList.append(destPoints)
-	if(len(sourceFacesList) > 10):
+	if(len(sourceFacesList) > 5):
 		sourceFacesList.popleft()
 	return sourceFacesList
 
@@ -241,7 +250,6 @@ def avgList(sourceFacesist):
 		            sumPoint[1]/len(sourceFacesList)))
 		# print(avgPoint)
 		destList.append(avgPoint)
-	print(destList)
 	return destList
 
 def replacePixels(imageDest, interpObjs, bInv, a, rect_dst, mask, mask_moments):
@@ -263,8 +271,8 @@ def replacePixels(imageDest, interpObjs, bInv, a, rect_dst, mask, mask_moments):
 
 # bListInv1 = calBarycentricInv(subdivDest)
 
-# imageSource = cv2.imread('TestSet_P2/Scarlett.jpg')
-imageSource = cv2.imread('TestSet_P2/Rambo.jpg')
+imageSource = cv2.imread('TestSet_P2/Scarlett.jpg')
+# imageSource = cv2.imread('TestSet_P2/Rambo.jpg')
 _, image2, srcPoints, faceDetected = getTri(imageSource)
 # bList2 = calBarycentric(subdivSrc)
 # gray = cv2.cvtColor(imageSource, cv2.COLOR_BGR2GRAY)
@@ -277,7 +285,8 @@ interpObjg = interpolate.interp2d(x_src_range, y_src_range, imageSource[:,:,1], 
 interpObjr = interpolate.interp2d(x_src_range, y_src_range, imageSource[:,:,2], kind='cubic')
 interpObjs = [interpObjb,interpObjg,interpObjr]
 
-vidcap = cv2.VideoCapture('TestSet_P2/Test1.mp4')
+# vidcap = cv2.VideoCapture('TestSet_P2/Test3.mp4')
+vidcap = cv2.VideoCapture('TestSet_P2/data1.mp4')
 # load the input image, resize it, and convert it to grayscale
 # ret, imageDest = cap.read()
 
@@ -290,11 +299,10 @@ sourceFacesList = deque([])
 firstRun = True
 while(success):
 	imageDestPoisson = copy.deepcopy(imageDest)
-	imageDestFilter = copy.deepcopy(imageDest)
+	imageDestTri = copy.deepcopy(imageDest)
 	subdivDest,image1,destPoints,faceDetected = getTri(imageDest)
 	
-	print(i)
-	print(faceDetected)
+	invSuccessFlag = True
 	if(faceDetected):
 		if firstRun:
 			indexesTrianglesDest = getTriIndices(subdivDest,destPoints,imageDest)
@@ -302,14 +310,14 @@ while(success):
 		sourceFacesList = appendList(sourceFacesList, destPoints)
 		destPoints = avgList(sourceFacesList)
 
-		for (x, y) in destPoints:
-			cv2.circle(imageDestFilter, (x, y), 1, (0, 255, 0), 4)
-		image1 = imageDestFilter
-		'''
+		# for (x, y) in destPoints:
+		# 	cv2.circle(imageDestFilter, (x, y), 1, (0, 255, 0), 4)
+		# image1 = imageDestFilter
+		
 		# print(len(destPoints))
 		mask_moments = np.zeros((imageDest.shape[0], imageDest.shape[1]))
 		mask = np.zeros(imageDest.shape, imageDest.dtype)
-		invSuccessFlag = True
+		firstFlag = True
 		for triangle_index in indexesTrianglesDest:
 			src_pt1 = srcPoints[triangle_index[0]]
 			src_pt2 = srcPoints[triangle_index[1]]
@@ -334,11 +342,13 @@ while(success):
 
 			if(invSuccessFlag):
 				replacePixels(imageDest, interpObjs, bInv, a, rect_dst, mask, mask_moments)
-
-			# cv2.line(imageDest, dst_pt1, dst_pt2, (0, 0, 255), 2)
-			# cv2.line(imageDest, dst_pt3, dst_pt2, (0, 0, 255), 2)
-			# cv2.line(imageDest, dst_pt1, dst_pt3, (0, 0, 255), 2)
-
+			
+			# if firstFlag:
+			# 	cv2.line(imageDestTri, dst_pt1, dst_pt2, (0, 0, 255), 2)
+			# 	cv2.line(imageDestTri, dst_pt3, dst_pt2, (0, 0, 255), 2)
+			# 	cv2.line(imageDestTri, dst_pt1, dst_pt3, (0, 0, 255), 2)
+			# 	image1 = imageDestTri
+			# 	firstFlag = False
 			# cv2.line(imageSource, src_pt1, src_pt2, (0, 0, 255), 2)
 			# cv2.line(imageSource, src_pt3, src_pt2, (0, 0, 255), 2)
 			# cv2.line(imageSource, src_pt1, src_pt3, (0, 0, 255), 2)
@@ -361,9 +371,9 @@ while(success):
 			# cv2.imshow('mask', mask)
 			# cv2.imshow('output', image1)
 			# cv2.waitKey(0)
-	'''
 	# cv2.imshow('imageDest', image1)
-	cv2.imwrite('output/'+str(i)+'.jpg', image1)
+	if invSuccessFlag:
+		cv2.imwrite('output/'+str(i)+'.jpg', image1)
 	# cv2.waitKey(0)
 	success, imageDest = vidcap.read()
 	i += 1
